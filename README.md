@@ -19,9 +19,10 @@ bi_caramba/
 ├── data/
 │   ├── raw/             
 │   │   ├── f_vente_bonbon.csv
-│   │   └── d_*.csv
+│   │   ├── d_*.csv
+│   │   └── h_*.csv
 │   └── final/           
-│       └── entrepot.xlxs
+│       └── entrepot_enrichi.xlxs
 │
 ├── sql/
 │   ├── schema_caramba_snowflake.sql
