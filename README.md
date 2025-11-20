@@ -21,8 +21,7 @@ bi_caramba/
 │   │   ├── f_vente_bonbon.csv
 │   │   └── d_*.csv
 │   └── final/           
-│       ├── f_vente_bonbon_final.csv
-│       └── d_*.csv
+│       └── entrepot.xlxs
 │
 ├── sql/
 │   ├── schema_caramba_snowflake.sql
