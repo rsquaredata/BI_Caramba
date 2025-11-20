@@ -1,0 +1,18 @@
+nom_site;responsable;adresse;code_postal;ville;libelle
+Bastille_E;mickael;1 champ elysee;75000;Paris;epicerie
+Bron_E;adeline;3 rue Marechal Leclec;69500;Lyon;epicerie
+Bron_S;elodie;30 Avenue Albert Thomas;69500;Lyon;supermarche
+Cassis_E;pierre;3 rue Roux;13000;Marseille;epicerie
+Cassis_H;claire;1 rue de la Falaise;13000;Marseille;hypermarche
+Neuilly_Sup;elosie;40 impasse Marechal;75000;Paris;superette
+Roubaix_E;david;63 rue Xavier;59000;Lille;epicerie
+Roubaix_H;fadila;80 rue Martial;59000;Lille;hypermarche
+Royal_bonbon;Emma;10 rue Dobree;44000;Nantes;confiserie
+Bubble_bonbon;Philipe;30 rue Helene Boucher;56000;Vannes;confiserie
+Le_bon_thabor;Laura;1 rue de l'Etang;35000;Rennes;confiserie
+La_pause_bonbon;Marc;25 rue Flammekueche;67000;Strasbourg;confiserie
+Bonbons_bordeaux;Marius;3 impasse du vin;33000;Bordeaux;supermarche
+Nantes_h;Melanie;9 rue d'Alger;44000;Nantes;hypermarche
+Bordeaux_H;Timothee;6 rue du Lac;33000;Bordeaux;hypermarche
+Rennes_S;Noemie;4 Frilouze;35000;Rennes;supermarche
+Strasbourg_supp;Tom;7 lieu dit Trel;67000;Strasbourg;superette
