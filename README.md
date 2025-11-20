@@ -20,10 +20,6 @@ bi_caramba/
 │   ├── raw/             
 │   │   ├── f_vente_bonbon.csv
 │   │   └── d_*.csv
-│   ├── enriched/        
-│   │   ├── enrichissement_analytique.csv
-│   │   ├── enrichissement_geographique.csv
-│   │   └── enrichissement_metier.csv
 │   └── final/           
 │       ├── f_vente_bonbon_final.csv
 │       └── d_*.csv
