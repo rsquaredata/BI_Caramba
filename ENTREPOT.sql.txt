@@ -1,0 +1,362 @@
+-- DROP ALL IF ERRORS
+BEGIN
+   FOR obj IN (
+      SELECT object_name, object_type 
+      FROM user_objects 
+      WHERE object_type IN ('TABLE', 'VIEW', 'SEQUENCE', 'PACKAGE', 'PROCEDURE', 'FUNCTION', 'TRIGGER', 'SYNONYM')
+   ) LOOP
+      BEGIN
+         EXECUTE IMMEDIATE 'DROP ' || obj.object_type || ' "' || obj.object_name || '" CASCADE CONSTRAINTS';
+      EXCEPTION
+         WHEN OTHERS THEN
+            NULL; -- ignore errors for objects that cannot be dropped
+      END;
+   END LOOP;
+END;
+/
+
+-- CREATE TABLES
+
+-- ============================
+-- DIMENSION : Revenus villes
+-- ============================
+CREATE TABLE revenus_villes (
+    codgeo VARCHAR2(50) PRIMARY KEY,
+    libgeo VARCHAR2(50),
+    med15  NUMBER
+);
+
+-- ============================
+-- Hiérarchie : Département
+-- ============================
+CREATE TABLE dpt_mag (
+    departement VARCHAR2(50) PRIMARY KEY,
+    region      VARCHAR2(50)
+);
+
+-- ============================
+-- DIMENSION : Ville
+-- ============================
+CREATE TABLE ville_mag (
+    ville                   VARCHAR2(50) PRIMARY KEY,
+    departement             VARCHAR2(50),
+    revenus_mensuels        NUMBER,
+    population_habitants    NUMBER,
+    taux_pauvrete           FLOAT,
+    nb_concurrent           NUMBER,
+    CONSTRAINT fk_ville_dept 
+        FOREIGN KEY (departement) REFERENCES dpt_mag(departement)
+);
+
+-- ============================
+-- DIMENSION : Type Magasin
+-- ============================
+CREATE TABLE type_mag (
+    libelle        VARCHAR2(50) PRIMARY KEY,
+    surface_min    NUMBER,
+    surface_max    NUMBER
+);
+
+-- ============================
+-- DIMENSION : Magasin
+-- ============================
+CREATE TABLE magasin (
+    nom_site       VARCHAR2(50) PRIMARY KEY,
+    responsable    VARCHAR2(50),
+    adresse        VARCHAR2(100),
+    code_postal    VARCHAR2(10),
+    ville          VARCHAR2(50),
+    libelle        VARCHAR2(50),
+    annee_ouverture NUMBER,
+    heures_travail_semaine NUMBER,
+    zone_commerciale VARCHAR2(3),
+    nb_clients_mois NUMBER,
+    satisfaction_clients FLOAT,
+    surface_magasins_m2 NUMBER,
+    CONSTRAINT fk_mag_ville 
+        FOREIGN KEY (ville) REFERENCES ville_mag(ville),
+    CONSTRAINT fk_mag_type 
+        FOREIGN KEY (libelle) REFERENCES type_mag(libelle)
+);
+
+-- ============================
+-- DIMENSION : Type de Bonbon
+-- ============================
+CREATE TABLE type_bonbon (
+    nom            VARCHAR2(50) PRIMARY KEY
+);
+
+-- ============================
+-- Hiérachie : Année
+-- ============================
+CREATE TABLE annee (
+    annee          NUMBER PRIMARY KEY
+);
+
+-- ============================
+-- Hiérachie : Trimestriel (trimestre→année)
+-- ============================
+CREATE TABLE trimestriel (
+    trimestre      VARCHAR2(20) PRIMARY KEY,
+    annee          NUMBER,
+    CONSTRAINT fk_trim_annee
+        FOREIGN KEY (annee) REFERENCES annee(annee)
+);
+
+-- ============================
+-- DIMENSION : Evenements
+-- ============================
+CREATE TABLE evenements (
+    evenement VARCHAR2(20) PRIMARY KEY,
+    mois      VARCHAR2(20),
+    saison    VARCHAR2(10)
+);
+
+-- ============================
+-- DIMENSION : Volume vente confiseries
+-- ============================
+CREATE TABLE volume_vente_confiseries (
+    annee NUMBER,
+    mois VARCHAR2(20),
+    volume_vente FLOAT,
+    PRIMARY KEY (annee, mois)
+);
+
+-- ============================
+-- DIMENSION : Periode (mois→trimestre)
+-- ============================
+CREATE TABLE periode (
+    mois           VARCHAR2(20) PRIMARY KEY,
+    trimestre      VARCHAR2(20),
+    mois_normalise VARCHAR2(15) GENERATED ALWAYS AS (
+        CASE LOWER(SUBSTR(mois, 1, INSTR(mois, '-') - 1))
+            WHEN 'janv' THEN 'janvier'
+            WHEN 'févr' THEN 'février'
+            WHEN 'mars' THEN 'mars'
+            WHEN 'avr'  THEN 'avril'
+            WHEN 'mai'  THEN 'mai'
+            WHEN 'juin' THEN 'juin'
+            WHEN 'juil' THEN 'juillet'
+            WHEN 'août' THEN 'août'
+            WHEN 'sept' THEN 'septembre'
+            WHEN 'oct'  THEN 'octobre'
+            WHEN 'nov'  THEN 'novembre'
+            WHEN 'déc'  THEN 'décembre'
+        END
+    ) VIRTUAL,
+    CONSTRAINT fk_periode_trim
+        FOREIGN KEY (trimestre) REFERENCES trimestriel(trimestre)
+);
+
+-- ============================
+-- Fait : Vente bonbon
+-- ============================
+CREATE TABLE vente_bonbon (
+    id_vente        NUMBER PRIMARY KEY,
+    nombre          NUMBER,
+    nom_site        VARCHAR2(50),
+    mois            VARCHAR2(20),
+    nom             VARCHAR2(50),
+    poids_total     NUMBER,
+    chiffre_affaire NUMBER,
+    mois_normalise  VARCHAR2(15),
+
+    CONSTRAINT fk_fact_mag 
+        FOREIGN KEY (nom_site) REFERENCES magasin(nom_site),
+
+    CONSTRAINT fk_fact_periode 
+        FOREIGN KEY (mois) REFERENCES periode(mois),
+
+    CONSTRAINT fk_fact_bonbon 
+        FOREIGN KEY (nom) REFERENCES type_bonbon(nom)
+);
+
+-- Aggrégations
+CREATE MATERIALIZED VIEW mv_ca_trimestre
+BUILD IMMEDIATE 
+REFRESH ON DEMAND
+AS
+SELECT 
+    t.annee, 
+    t.trimestre, 
+    SUM(v.chiffre_affaire) AS ca_trimestre
+FROM vente_bonbon v
+JOIN periode p ON v.mois = p.mois
+JOIN trimestriel t ON p.trimestre = t.trimestre
+GROUP BY t.annee, t.trimestre;
+
+SELECT * FROM mv_ca_trimestre ORDER BY annee, trimestre;
+
+CREATE MATERIALIZED VIEW mv_ca_region_type
+BUILD IMMEDIATE 
+REFRESH ON DEMAND
+AS
+SELECT 
+    d.region,
+    tb.nom AS type_bonbon,
+    SUM(v.chiffre_affaire) AS ca_total
+FROM vente_bonbon v
+JOIN magasin m ON v.nom_site = m.nom_site
+JOIN ville_mag vm ON m.ville = vm.ville
+JOIN dpt_mag d ON vm.departement = d.departement
+JOIN type_bonbon tb ON v.nom = tb.nom
+GROUP BY d.region, tb.nom;
+
+SELECT * FROM mv_ca_region_type ORDER BY region, type_bonbon;
+
+CREATE MATERIALIZED VIEW mv_poids_type_mag
+BUILD IMMEDIATE 
+REFRESH ON DEMAND
+AS
+SELECT 
+    tm.libelle,
+    SUM(v.poids_total) AS poids_total
+FROM vente_bonbon v
+JOIN magasin m ON v.nom_site = m.nom_site
+JOIN type_mag tm ON m.libelle = tm.libelle
+GROUP BY tm.libelle;
+
+SELECT * FROM mv_poids_type_mag ORDER BY libelle;
+
+SELECT 
+    annee,
+    trimestre,
+    ca_trimestre,
+    ca_trimestre
+        - LAG(ca_trimestre) OVER (ORDER BY annee, trimestre)
+        AS evolution_valeur,
+
+    ROUND(
+        (ca_trimestre - LAG(ca_trimestre) OVER (ORDER BY annee, trimestre))
+        / LAG(ca_trimestre) OVER (ORDER BY annee, trimestre) * 100,
+        2
+    ) AS evolution_pourcentage
+
+FROM mv_ca_trimestre
+ORDER BY annee, trimestre;
+
+SELECT 
+    p.mois,
+    t.annee,
+    SUM(v.chiffre_affaire) AS ca_mois,
+
+    SUM(v.chiffre_affaire)
+        - LAG(SUM(v.chiffre_affaire)) 
+          OVER (ORDER BY t.annee, p.mois) 
+        AS evolution_valeur,
+
+    ROUND(
+        (SUM(v.chiffre_affaire)
+            - LAG(SUM(v.chiffre_affaire)) 
+              OVER (ORDER BY t.annee, p.mois))
+        / LAG(SUM(v.chiffre_affaire)) 
+              OVER (ORDER BY t.annee, p.mois) * 100,
+        2
+    ) AS evolution_percent
+
+FROM vente_bonbon v
+JOIN periode p      ON v.mois = p.mois
+JOIN trimestriel t  ON p.trimestre = t.trimestre
+GROUP BY t.annee, p.mois
+ORDER BY t.annee, p.mois;
+
+SELECT 
+    annee,
+    SUM(ca_trimestre) AS ca_annuel,
+    
+    SUM(ca_trimestre)
+        - LAG(SUM(ca_trimestre)) 
+          OVER (ORDER BY annee)
+        AS evolution_valeur,
+
+    ROUND(
+        (SUM(ca_trimestre)
+            - LAG(SUM(ca_trimestre)) 
+              OVER (ORDER BY annee))
+        / LAG(SUM(ca_trimestre)) 
+              OVER (ORDER BY annee) * 100,
+        2
+    ) AS evolution_percent
+
+FROM mv_ca_trimestre
+GROUP BY annee
+ORDER BY annee;
+
+SELECT 
+    t.annee,
+    SUM(f.chiffre_affaire) AS ca_annuel
+FROM vente_bonbon f
+JOIN periode p 
+    ON f.mois = p.mois
+JOIN trimestriel t 
+    ON p.trimestre = t.trimestre
+GROUP BY t.annee
+ORDER BY t.annee;
+
+SELECT 
+    t.trimestre,
+    SUM(f.chiffre_affaire) AS ca_trimestriel
+FROM vente_bonbon f
+JOIN periode p 
+    ON f.mois = p.mois
+JOIN trimestriel t 
+    ON p.trimestre = t.trimestre
+WHERE t.annee = 2014
+GROUP BY t.trimestre
+ORDER BY t.trimestre;
+
+SELECT 
+    e.evenement,
+    SUM(f.chiffre_affaire) AS ca_evenement
+FROM vente_bonbon f
+JOIN evenements e 
+    ON f.mois_normalise = e.mois
+GROUP BY e.evenement
+ORDER BY ca_evenement DESC;
+
+SELECT 
+    e.evenement,
+    b.nom AS type_bonbon,
+    SUM(f.chiffre_affaire) AS ca_total
+FROM vente_bonbon f
+JOIN evenements e 
+    ON f.mois_normalise = e.mois
+JOIN type_bonbon b 
+    ON f.nom = b.nom
+GROUP BY e.evenement, b.nom
+ORDER BY e.evenement, ca_total DESC;
+
+SELECT 
+    v.departement,
+    t.annee,
+    p.mois_normalise AS mois,
+    SUM(f.chiffre_affaire) AS ca_total,
+    dv.volume_vente AS indice_national
+FROM vente_bonbon f
+JOIN periode p 
+    ON f.mois_normalise = p.mois_normalise
+JOIN trimestriel t 
+    ON p.trimestre = t.trimestre
+JOIN magasin m
+    ON f.nom_site = m.nom_site
+JOIN ville_mag v
+    ON m.ville = v.ville
+JOIN volume_vente_confiseries dv
+    ON dv.annee = t.annee
+   AND dv.mois = p.mois_normalise
+GROUP BY v.departement, t.annee, p.mois_normalise, dv.volume_vente
+ORDER BY t.annee, p.mois_normalise;
+
+SELECT 
+    v.departement,
+    rv.med15 AS revenu_median,
+    SUM(f.chiffre_affaire) AS ca_total
+FROM vente_bonbon f
+JOIN magasin m 
+    ON f.nom_site = m.nom_site
+JOIN ville_mag v 
+    ON m.ville = v.ville
+JOIN revenus_villes rv 
+    ON v.ville = rv.libgeo
+GROUP BY v.departement, rv.med15
+ORDER BY rv.med15 DESC;
