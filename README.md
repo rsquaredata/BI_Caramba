@@ -36,7 +36,7 @@ bi_caramba/
 │
 └── docs/
     ├── rapport_caramba.pdf
-    ├── rapport_caramba.tex
+    ├── rapport_caramba.zip
     └── annexe_tableau/
         ├── screenshot1.png
         ├── screenshot2.png
