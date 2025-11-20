@@ -360,3 +360,4 @@ JOIN revenus_villes rv
     ON v.ville = rv.libgeo
 GROUP BY v.departement, rv.med15
 ORDER BY rv.med15 DESC;
+
